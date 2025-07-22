@@ -176,12 +176,34 @@ void mark_all_overlaps(uint64_t addr, uint64_t len) {
 	}
 }
 
-// used to determine buffer length when it's encoded in a header
-uint64_t get_buffer_length(uint64_t addr, uint8_t type) {
-	// use gpu_read() to read buffer size information from VRAM
-	// return the full length of the buffer including header information
-	// warn + return 0 if len < header len
-	return 0;
+uint32_t get_header_length(uint8_t type) {
+	switch(type) {
+		case TYPE_CBO:	return 4;	break;
+		default:		return 0;
+	}
+}
+
+uint64_t get_header_info(header_t* header, uint64_t addr, uint8_t type) {
+	uint32_t header_len = get_header_length(type);
+	if(!header_len)
+		ERROR("bad type specified to get_header_info\n");
+
+	uint8_t* data = malloc(header_len);
+	data = gpu_read(data, addr, header_len);
+
+	if(!data)
+		ERROR("something went wrong reading header of object %llx\n", addr);
+
+	uint64_t len = 0;
+	switch(type) {
+		case TYPE_CBO:
+			header->n_cmd_bytes = *(uint32_t*)data;
+			if(header->n_cmd_bytes)
+				len = header_len + header->n_cmd_bytes;
+			break;
+	}
+
+	return len;
 }
 
 object_t* get_object_precise(uint64_t addr, uint8_t type, int64_t len) {
@@ -219,6 +241,8 @@ object_t* create_object(uint64_t addr, uint8_t type, uint64_t len) {
 	obj->addr = addr;
 	obj->len = len;
 	obj->type = type;
+	obj->header_len = get_header_length(type);
+	// obj's new header copy is set just after this in ref_buffer_precise
 
 	add_to_bucket(obj);
 
@@ -229,6 +253,11 @@ object_t* create_object(uint64_t addr, uint8_t type, uint64_t len) {
 		glBindBuffer(GL_ARRAY_BUFFER, obj->gl_buffer);
 		glBufferData(GL_ARRAY_BUFFER, obj->len, data, GL_STATIC_DRAW);
 	}
+	if(type == TYPE_IBO) {
+		glGenBuffers(1, &obj->gl_buffer);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->gl_buffer);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, obj->len, data, GL_STATIC_DRAW);
+	}
 
 	free(data);
 	return obj;
@@ -238,9 +267,23 @@ void object_read(object_t* obj, uint8_t* dst, uint64_t src, uint64_t n) {
 	if(src < obj->addr || src + n > obj->addr + obj->len)
 		ERROR("object read [%d,%d] out of bounds\n", src, src + n - 1);
 
+	if(src < obj->addr + get_header_length(obj->type)) {
+		uint32_t count = obj->addr + get_header_length(obj->type) - src;
+		count = count > n ? n : count;
+		memmove(dst, vram + src, count);
+		dst += count;
+		src += count;
+		n -= count;
+		if(!n)
+			return;
+	}
+
 	if(obj->type == TYPE_VBO) {
 		glBindBuffer(GL_ARRAY_BUFFER, obj->gl_buffer);
 		glGetBufferSubData(GL_ARRAY_BUFFER, src - obj->addr, n, dst);
+	} else if(obj->type == TYPE_IBO) {
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->gl_buffer);
+		glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, src - obj->addr, n, dst);
 	} else
 		memmove(dst, vram + src, n);
 }
@@ -249,12 +292,25 @@ void object_write(object_t* obj, uint64_t dst, uint8_t* src, uint64_t n) {
 	if(dst < obj->addr || dst + n > obj->addr + obj->len)
 		ERROR("object write [%d,%d] out of bounds\n", dst, dst + n - 1);
 
+	if(dst < obj->addr + get_header_length(obj->type)) {
+		obj->need_update = 1;	// mark object for recreation if header changed
+
+		uint32_t count = obj->addr + get_header_length(obj->type) - dst;
+		count = count > n ? n : count;
+		dst += count;
+		src += count;
+		n -= count;
+		if(!n)
+			return;
+	}
+
 	if(obj->type == TYPE_VBO) {
 		glBindBuffer(GL_ARRAY_BUFFER, obj->gl_buffer);
 		glBufferSubData(GL_ARRAY_BUFFER, dst - obj->addr, n, src);
+	} else if(obj->type == TYPE_IBO) {
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->gl_buffer);
+		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, dst - obj->addr, n, src);
 	}
-
-	obj->need_update = 1;	// TODO: only if header (size) doesn't match obj->len
 }
 
 // flush object's data to VRAM
@@ -322,8 +378,10 @@ object_t* ref_buffer_precise(uint64_t addr, uint8_t type, int64_t len) {
 		WARN("referenced buffer address %llx is not 256-byte aligned\n", addr);
 		return 0;
 	}
+
+	header_t header;
 	if(len == LENGTH_IN_BUFFER)
-		len = get_buffer_length(addr, type);
+		len = get_header_info(&header, addr, type);
 
 	if(!len) {
 		WARN("referenced zero-length buffer %llx\n", addr);
@@ -346,6 +404,8 @@ object_t* ref_buffer_precise(uint64_t addr, uint8_t type, int64_t len) {
 		}
 
 		obj = create_object(addr, type, len);
+		if(get_header_length(type))
+			obj->header = header;	// update internal copy of header
 	}
 
 	obj->refcount = ref_counter++;

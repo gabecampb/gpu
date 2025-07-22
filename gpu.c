@@ -29,13 +29,13 @@ void dispatch_cmd_buffer(uint64_t addr) {
 		return;
 	}
 
-	uint8_t* cmd_buff = calloc(1, obj->len);
-	gpu_read(cmd_buff, addr, obj->len);
+	uint8_t* cmds = calloc(1, obj->len);
+	gpu_read(cmds, addr, obj->len);
 
-	command_decoder(cmd_buff, obj->len);
+	command_decoder(cmds + obj->header_len, obj->header.n_cmd_bytes);
 
 	destroy_all_overlaps();
-	free(cmd_buff);
+	free(cmds);
 }
 
 void process_batch(uint64_t ring_addr, uint64_t read_ptr, uint64_t read_len) {

@@ -13,16 +13,23 @@
 #define TYPE_IBO		3
 #define IS_VALID_TYPE(x) (x != 0 && x <= NUM_INTERNAL_TYPES)
 
+// internal copy of object header info
+typedef struct header_t {
+	uint32_t n_cmd_bytes;
+} header_t;
+
 // internal representation of an object
 typedef struct object_t {
 	uint64_t addr;
 	uint64_t len;
 	uint8_t type;
+	header_t header;
+	uint32_t header_len;
 
 	uint8_t in_overlaps;
+	uint8_t need_update;
 	int64_t refcount;
 
-	uint8_t need_update;
 	GLuint gl_buffer;
 } object_t;
 
