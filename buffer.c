@@ -203,6 +203,7 @@ uint64_t get_header_info(header_t* header, uint64_t addr, uint8_t type) {
 			break;
 	}
 
+	free(data);
 	return len;
 }
 
@@ -358,7 +359,7 @@ void free_object(object_t* obj) {
 		mark_all_overlaps(obj->addr, obj->len);
 	}
 
-	if(obj->type == TYPE_VBO)
+	if(obj->type == TYPE_VBO || obj->type == TYPE_IBO)
 		glDeleteBuffers(1, &obj->gl_buffer);
 	free(obj);
 }
