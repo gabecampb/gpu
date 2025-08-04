@@ -5,12 +5,19 @@
 #define RW_REQ_BIT (1 << 30)
 #define RW_OP_BIT (1 << 29)
 
+// scanout control register flags
+#define PAGE_FLIP_BIT (1 << 31)
+#define VSYNC_ON_BIT (1 << 30)
+
+// GPU register addresses
 #define GPU_CTRL_REG			0x26000
 #define RAM_ADDR_REG			0x26004
 #define VRAM_ADDR_REG			0x2600C
 #define QUEUE_ADDR_REG			0x26014
 #define QUEUE_READ_PTR_REG		0x2601C
 #define QUEUE_READ_LEN_REG		0x26024
+#define SCANOUT_CTRL_REG		0x2602C
+#define SCANOUT_TBO_ADDR_REG	0x26030
 
 void command_decoder(uint8_t* commands, uint64_t len) {
 
@@ -75,8 +82,10 @@ void gpu_registers_update(uint64_t start, uint64_t length) {
 	uint64_t* ring_addr	= (uint64_t*)&ram[QUEUE_ADDR_REG];
 	uint64_t* read_ptr	= (uint64_t*)&ram[QUEUE_READ_PTR_REG];
 	uint64_t* read_len	= (uint64_t*)&ram[QUEUE_READ_LEN_REG];
+	uint32_t* scan_ctrl	= (uint32_t*)&ram[SCANOUT_CTRL_REG];
+	uint64_t* scan_tbo	= (uint64_t*)&ram[SCANOUT_TBO_ADDR_REG];
 
-	if((*ctrl) & DOORBELL_BIT) {
+	if(*ctrl & DOORBELL_BIT) {
 		uint64_t old_read_ptr = *read_ptr;
 		*read_ptr += *read_len;
 		*ctrl &= ~DOORBELL_BIT;
@@ -90,5 +99,10 @@ void gpu_registers_update(uint64_t start, uint64_t length) {
 		}
 		process_batch(*ring_addr, old_read_ptr, *read_len);
 		// TODO: check for new doorbell rings issued since the last
+	}
+
+	if(*scan_ctrl & PAGE_FLIP_BIT) {
+		*scan_ctrl &= ~PAGE_FLIP_BIT;
+		page_flip(*scan_tbo, (*scan_ctrl & VSYNC_ON_BIT) > 0);
 	}
 }

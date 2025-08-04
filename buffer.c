@@ -179,6 +179,7 @@ void mark_all_overlaps(uint64_t addr, uint64_t len) {
 uint32_t get_header_length(uint8_t type) {
 	switch(type) {
 		case TYPE_CBO:	return 4;	break;
+		case TYPE_TBO:	return 14;	break;
 		default:		return 0;
 	}
 }
@@ -200,6 +201,30 @@ uint64_t get_header_info(header_t* header, uint64_t addr, uint8_t type) {
 			header->n_cmd_bytes = *(uint32_t*)data;
 			if(header->n_cmd_bytes)
 				len = header_len + header->n_cmd_bytes;
+			break;
+		case TYPE_TBO:
+			header->tex_info = *(uint16_t*)data;
+			header->has_mipmaps = header->tex_info >> 15;
+			header->n_dims = (header->tex_info >> 13) & 0x3;
+			if(header->n_dims == 0 || header->n_dims > 3)
+				break;
+			memcpy(header->dims, data + 2, 12);
+			for(uint32_t i = 0; i < header->n_dims; i++) {
+				if(header->dims[i] == 0
+				|| (header->n_dims == 1 && header->dims[i] > MAX_1D_TEXTURE_DIM)
+				|| (header->n_dims == 2 && header->dims[i] > MAX_2D_TEXTURE_DIM)
+				|| (header->n_dims == 3 && header->dims[i] > MAX_3D_TEXTURE_DIM))
+					break;
+			}
+			header->tex_format = header->tex_info & 0xFF;
+			if(!IS_VALID_FORMAT(header->tex_format))
+				break;
+			if((header->has_mipmaps || header->n_dims != 2)
+			&& (header->tex_format == FORMAT_DEPTH_16
+				|| header->tex_format == FORMAT_DEPTH_32F
+				|| header->tex_format == FORMAT_DEPTH_24_STENCIL_8))
+				break;
+			len = header_len + get_tex_data_size(header);
 			break;
 	}
 
@@ -228,7 +253,7 @@ object_t* get_object_precise(uint64_t addr, uint8_t type, int64_t len) {
 	return 0;
 }
 
-object_t* create_object(uint64_t addr, uint8_t type, uint64_t len) {
+object_t* create_object(header_t* header, uint64_t addr, uint8_t type, uint64_t len) {
 	uint8_t* data = malloc(len);
 	data = gpu_read(data, addr, len);
 
@@ -243,7 +268,7 @@ object_t* create_object(uint64_t addr, uint8_t type, uint64_t len) {
 	obj->len = len;
 	obj->type = type;
 	obj->header_len = get_header_length(type);
-	// obj's new header copy is set just after this in ref_buffer_precise
+	obj->header = *header;
 
 	add_to_bucket(obj);
 
@@ -258,6 +283,11 @@ object_t* create_object(uint64_t addr, uint8_t type, uint64_t len) {
 		glGenBuffers(1, &obj->gl_buffer);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->gl_buffer);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, obj->len, data, GL_STATIC_DRAW);
+	}
+	if(type == TYPE_TBO) {
+		glGenBuffers(1, &obj->gl_buffer);
+		glBindTexture(get_tex_gl_target(obj->header.n_dims), obj->gl_buffer);
+		upload_texture(obj, data);
 	}
 
 	free(data);
@@ -285,7 +315,9 @@ void object_read(object_t* obj, uint8_t* dst, uint64_t src, uint64_t n) {
 	} else if(obj->type == TYPE_IBO) {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->gl_buffer);
 		glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, src - obj->addr, n, dst);
-	} else
+	} else if(obj->type == TYPE_TBO)
+		read_texture(obj, dst, src, n);
+	else
 		memmove(dst, vram + src, n);
 }
 
@@ -311,7 +343,8 @@ void object_write(object_t* obj, uint64_t dst, uint8_t* src, uint64_t n) {
 	} else if(obj->type == TYPE_IBO) {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->gl_buffer);
 		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, dst - obj->addr, n, src);
-	}
+	} else if(obj->type == TYPE_TBO)
+		write_texture(obj, dst, src, n);
 }
 
 // flush object's data to VRAM
@@ -359,7 +392,7 @@ void free_object(object_t* obj) {
 		mark_all_overlaps(obj->addr, obj->len);
 	}
 
-	if(obj->type == TYPE_VBO || obj->type == TYPE_IBO)
+	if(obj->type == TYPE_VBO || obj->type == TYPE_IBO || obj->type == TYPE_TBO)
 		glDeleteBuffers(1, &obj->gl_buffer);
 	free(obj);
 }
@@ -404,9 +437,7 @@ object_t* ref_buffer_precise(uint64_t addr, uint8_t type, int64_t len) {
 			free_object(obj);
 		}
 
-		obj = create_object(addr, type, len);
-		if(get_header_length(type))
-			obj->header = header;	// update internal copy of header
+		obj = create_object(&header, addr, type, len);
 	}
 
 	obj->refcount = ref_counter++;
