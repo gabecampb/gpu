@@ -46,9 +46,9 @@ void page_flip(uint64_t addr, uint8_t vsync_on) {
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, page_flip_fbo);
 	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
 		GL_TEXTURE_2D, obj->gl_buffer, 0);
-	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	GLenum status = glCheckFramebufferStatus(GL_READ_FRAMEBUFFER);
 	if(status != GL_FRAMEBUFFER_COMPLETE) {
-		WARN("page_flip: framebuffer was incomplete\n");
+		WARN("page_flip: read framebuffer was incomplete\n");
 		return;
 	}
 
