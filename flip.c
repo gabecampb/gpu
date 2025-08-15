@@ -32,9 +32,7 @@ void page_flip(uint64_t addr, uint8_t vsync_on) {
 		WARN("page_flip: texture object %llx was not 2D\n", obj->addr);
 		return;
 	}
-	if(obj->header.tex_format == FORMAT_DEPTH_16
-	|| obj->header.tex_format == FORMAT_DEPTH_32F
-	|| obj->header.tex_format == FORMAT_DEPTH_24_STENCIL_8) {
+	if(!IS_COLOR_FORMAT(obj->header.tex_format)) {
 		WARN("page_flip: texture object %llx was not of color format\n", obj->addr);
 		return;
 	}

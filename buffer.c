@@ -223,9 +223,7 @@ uint64_t get_header_info(header_t* header, uint64_t addr, uint8_t type) {
 			if(!IS_VALID_FORMAT(header->tex_format))
 				break;
 			if((header->has_mipmaps || header->n_dims != 2)
-			&& (header->tex_format == FORMAT_DEPTH_16
-				|| header->tex_format == FORMAT_DEPTH_32F
-				|| header->tex_format == FORMAT_DEPTH_24_STENCIL_8))
+			&& !IS_COLOR_FORMAT(header->tex_format))
 				break;
 			len = header_len + get_tex_data_size(header);
 			break;
@@ -397,6 +395,10 @@ void free_object(object_t* obj) {
 
 	if(obj->type == TYPE_VBO || obj->type == TYPE_IBO || obj->type == TYPE_TBO)
 		glDeleteBuffers(1, &obj->gl_buffer);
+	if(obj->type == TYPE_VBO && obj->gl_vao) {
+		glDeleteVertexArrays(1, &obj->gl_vao);
+		free(obj->gl_va_cfgs);
+	}
 	free(obj);
 }
 

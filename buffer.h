@@ -38,6 +38,8 @@ typedef struct object_t {
 	int64_t refcount;
 
 	GLuint gl_buffer;
+	GLuint gl_vao;
+	uint32_t* gl_va_cfgs;
 } object_t;
 
 typedef struct bucket_t {
@@ -45,6 +47,7 @@ typedef struct bucket_t {
 	object_t** objs;
 } bucket_t;
 
+uint8_t check_overlap(uint64_t x1, uint64_t x2, uint64_t y1, uint64_t y2);
 uint32_t get_region_object_count(uint64_t addr, uint64_t len);
 object_t* get_region_object_list(uint32_t match_idx, uint64_t addr, uint64_t len);
 uint32_t get_header_length(uint8_t type);

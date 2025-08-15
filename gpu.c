@@ -19,10 +19,6 @@
 #define SCANOUT_CTRL_REG		0x2602C
 #define SCANOUT_TBO_ADDR_REG	0x26030
 
-void command_decoder(uint8_t* commands, uint64_t len) {
-
-}
-
 void dispatch_cmd_buffer(uint64_t addr) {
 	if(addr % 256) {
 		WARN("command buffer address %llx is not 256-byte aligned, skipping\n", addr);

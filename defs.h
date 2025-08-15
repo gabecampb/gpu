@@ -20,6 +20,8 @@ extern GLFWwindow* window;
 #include "mem.h"
 #include "buffer.h"
 #include "texture.h"
+#include "shader.h"
+#include "commands.h"
 #include "flip.h"
 #include "gpu.h"
 

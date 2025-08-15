@@ -30,6 +30,10 @@
 
 #define IS_VALID_FORMAT(x) (x <= 14)
 
+#define IS_COLOR_FORMAT(x) (!(IS_DEPTH_FORMAT(x) || IS_DEPTH_STENCIL_FORMAT(x)))
+#define IS_DEPTH_FORMAT(x) (x == FORMAT_DEPTH_16 || x == FORMAT_DEPTH_32F)
+#define IS_DEPTH_STENCIL_FORMAT(x) (x == FORMAT_DEPTH_24_STENCIL_8)
+
 typedef struct tex_fmt {
 	uint32_t format;
 	uint32_t bpp;
