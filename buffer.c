@@ -165,6 +165,9 @@ void remove_from_overlaps(object_t* obj) {
 
 void mark_all_overlaps(uint64_t addr, uint64_t len) {
 	uint32_t count = get_region_object_count(addr, len);
+	if(count == 1)
+		return;		// no overlaps
+
 	for(uint32_t i = 0; i < count; i++) {
 		object_t* obj = get_region_object_list(i, addr, len);
 		if(obj->in_overlaps)
