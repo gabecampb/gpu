@@ -74,15 +74,18 @@ void upload_level(object_t* obj, uint32_t level, uint8_t* src) {
 
 	GLenum target = get_tex_gl_target(hdr->n_dims);
 	glBindTexture(target, obj->gl_buffer);
+
+	uint32_t dims[3];
+	get_tex_level_dims(hdr, level, dims);
 	switch(target) {
 		case GL_TEXTURE_1D:
-			glTexImage1D(target, level, gl_intl_fmt, hdr->dims[0], 0, gl_fmt, gl_type, src);
+			glTexImage1D(target, level, gl_intl_fmt, dims[0], 0, gl_fmt, gl_type, src);
 			break;
 		case GL_TEXTURE_2D:
-			glTexImage2D(target, level, gl_intl_fmt, hdr->dims[0], hdr->dims[1], 0, gl_fmt, gl_type, src);
+			glTexImage2D(target, level, gl_intl_fmt, dims[0], dims[1], 0, gl_fmt, gl_type, src);
 			break;
 		case GL_TEXTURE_3D:
-			glTexImage3D(target, level, gl_intl_fmt, hdr->dims[0], hdr->dims[1], hdr->dims[2], 0, gl_fmt, gl_type, src);
+			glTexImage3D(target, level, gl_intl_fmt, dims[0], dims[1], dims[2], 0, gl_fmt, gl_type, src);
 			break;
 	}
 }
