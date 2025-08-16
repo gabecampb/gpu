@@ -212,13 +212,18 @@ uint64_t get_header_info(header_t* header, uint64_t addr, uint8_t type) {
 			if(header->n_dims == 0 || header->n_dims > 3)
 				break;
 			memcpy(header->dims, data + 2, 12);
+			uint8_t invalid_dims = 0;
 			for(uint32_t i = 0; i < header->n_dims; i++) {
 				if(header->dims[i] == 0
 				|| (header->n_dims == 1 && header->dims[i] > MAX_1D_TEXTURE_DIM)
 				|| (header->n_dims == 2 && header->dims[i] > MAX_2D_TEXTURE_DIM)
-				|| (header->n_dims == 3 && header->dims[i] > MAX_3D_TEXTURE_DIM))
+				|| (header->n_dims == 3 && header->dims[i] > MAX_3D_TEXTURE_DIM)) {
+					invalid_dims = 1;
 					break;
+				}
 			}
+			if(invalid_dims)
+				break;
 			header->tex_format = header->tex_info & 0xFF;
 			if(!IS_VALID_FORMAT(header->tex_format))
 				break;
