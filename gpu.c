@@ -1,24 +1,5 @@
 #include "defs.h"
 
-// GPU control register flags
-#define DOORBELL_BIT (1 << 31)
-#define RW_REQ_BIT (1 << 30)
-#define RW_OP_BIT (1 << 29)
-
-// scanout control register flags
-#define PAGE_FLIP_BIT (1 << 31)
-#define VSYNC_ON_BIT (1 << 30)
-
-// GPU register addresses
-#define GPU_CTRL_REG			0x26000
-#define RAM_ADDR_REG			0x26004
-#define VRAM_ADDR_REG			0x2600C
-#define QUEUE_ADDR_REG			0x26014
-#define QUEUE_READ_PTR_REG		0x2601C
-#define QUEUE_READ_LEN_REG		0x26024
-#define SCANOUT_CTRL_REG		0x2602C
-#define SCANOUT_TBO_ADDR_REG	0x26030
-
 void dispatch_cmd_buffer(uint64_t addr) {
 	if(addr % 256) {
 		WARN("command buffer address %llx is not 256-byte aligned, skipping\n", addr);
@@ -80,6 +61,22 @@ void gpu_registers_update(uint64_t start, uint64_t length) {
 	uint64_t* read_len	= (uint64_t*)&ram[QUEUE_READ_LEN_REG];
 	uint32_t* scan_ctrl	= (uint32_t*)&ram[SCANOUT_CTRL_REG];
 	uint64_t* scan_tbo	= (uint64_t*)&ram[SCANOUT_TBO_ADDR_REG];
+	uint32_t* copy_r	= (uint32_t*)&ram[READ_CTRL_REG];
+	uint32_t* copy_w	= (uint32_t*)&ram[WRITE_CTRL_REG];
+
+	if(*copy_r & REQUEST_READ_BIT) {
+		uint64_t dst = *(uint64_t*)(ram + READ_DST_ADDR_REG);
+		uint64_t src = *(uint64_t*)(ram + READ_SRC_ADDR_REG);
+		uint64_t n   = *(uint64_t*)(ram + READ_LEN_REG);
+		request_read(dst, src, n);
+	}
+
+	if(*copy_w & REQUEST_WRITE_BIT) {
+		uint64_t dst = *(uint64_t*)(ram + WRITE_DST_ADDR_REG);
+		uint64_t src = *(uint64_t*)(ram + WRITE_SRC_ADDR_REG);
+		uint64_t n   = *(uint64_t*)(ram + WRITE_LEN_REG);
+		request_write(dst, src, n);
+	}
 
 	if(*ctrl & DOORBELL_BIT) {
 		uint64_t old_read_ptr = *read_ptr;

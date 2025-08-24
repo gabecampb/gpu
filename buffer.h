@@ -55,6 +55,7 @@ void object_read(object_t* obj, uint8_t* dst, uint64_t src, uint64_t n);
 void object_write(object_t* obj, uint64_t dst, uint8_t* src, uint64_t n);
 object_t* ref_buffer_precise(uint64_t addr, uint8_t type, int64_t len);
 object_t* get_object_precise(uint64_t addr, uint8_t type, int64_t len);
+void flush_object(object_t* obj);
 void destroy_all_overlaps();
 
 #endif

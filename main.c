@@ -5,6 +5,14 @@ uint8_t ram[RAM_CAPACITY];
 GLFWwindow* window;
 uint16_t window_width, window_height;
 
+void atomic_set(uint8_t* ptr, uint8_t value) {
+	*ptr = value;
+}
+
+uint8_t atomic_get(uint8_t* ptr) {
+	return *ptr;
+}
+
 void init_glfw() {
 	if(!glfwInit())
 		ERROR("failed to initialize glfw\n");

@@ -16,6 +16,8 @@
 
 extern uint8_t ram[];
 extern GLFWwindow* window;
+void atomic_set(uint8_t* ptr, uint8_t value);
+uint8_t atomic_get(uint8_t* ptr);
 
 #include "mem.h"
 #include "buffer.h"
@@ -23,6 +25,7 @@ extern GLFWwindow* window;
 #include "shader.h"
 #include "commands.h"
 #include "flip.h"
+#include "copy.h"
 #include "gpu.h"
 
 #define ERROR(...) { printf("fatal error: "); printf(__VA_ARGS__); exit(1); }
