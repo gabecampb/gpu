@@ -13,7 +13,7 @@
 #define TYPE_IBO		3
 #define TYPE_TBO		4
 #define TYPE_DTBL		5
-#define IS_VALID_TYPE(x) (x != 0 && x <= NUM_INTERNAL_TYPES)
+#define IS_VALID_TYPE(x) (x != 0 && x <= NUM_TYPES)
 
 // internal copy of object header info
 typedef struct header_t {
