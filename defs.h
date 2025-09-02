@@ -22,6 +22,7 @@ uint8_t atomic_get(uint8_t* ptr);
 #include "mem.h"
 #include "buffer.h"
 #include "texture.h"
+#include "dtable.h"
 #include "shader.h"
 #include "commands.h"
 #include "flip.h"

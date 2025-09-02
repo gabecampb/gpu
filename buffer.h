@@ -7,11 +7,12 @@
 #define LENGTH_IN_BUFFER -1
 #define ANY_LENGTH -2
 
-#define NUM_TYPES		4
+#define NUM_TYPES		5
 #define TYPE_CBO		1
 #define TYPE_VBO		2
 #define TYPE_IBO		3
 #define TYPE_TBO		4
+#define TYPE_DTBL		5
 #define IS_VALID_TYPE(x) (x != 0 && x <= NUM_INTERNAL_TYPES)
 
 // internal copy of object header info
@@ -23,6 +24,8 @@ typedef struct header_t {
 	uint8_t tex_format;
 	uint8_t n_dims;
 	uint32_t dims[3];
+
+	uint16_t n_descriptors;
 } header_t;
 
 // internal representation of an object

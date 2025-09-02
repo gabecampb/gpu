@@ -183,6 +183,7 @@ uint32_t get_header_length(uint8_t type) {
 	switch(type) {
 		case TYPE_CBO:	return 4;	break;
 		case TYPE_TBO:	return 14;	break;
+		case TYPE_DTBL:	return 2;	break;
 		default:		return 0;
 	}
 }
@@ -231,6 +232,12 @@ uint64_t get_header_info(header_t* header, uint64_t addr, uint8_t type) {
 			&& !IS_COLOR_FORMAT(header->tex_format))
 				break;
 			len = header_len + get_tex_data_size(header);
+			break;
+		case TYPE_DTBL:
+			header->n_descriptors = *(uint16_t*)data;
+			if(!header->n_descriptors)
+				break;
+			len = header_len + (header->n_descriptors * 16);
 			break;
 	}
 
@@ -292,6 +299,7 @@ object_t* create_object(header_t* header, uint64_t addr, uint8_t type, uint64_t 
 	}
 	if(type == TYPE_TBO) {
 		glGenBuffers(1, &obj->gl_buffer);
+		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(get_tex_gl_target(obj->header.n_dims), obj->gl_buffer);
 		upload_texture(obj, data);
 	}

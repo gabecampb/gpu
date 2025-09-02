@@ -2,6 +2,14 @@
 
 GLuint program;
 
+desc_access_t* get_accesses() {
+	return NULL;	// placeholder
+}
+
+uint32_t get_accessed_dtables() {
+	return 0;		// placeholder
+}
+
 void bind_program() {
 	if(program) {
 		glUseProgram(program);

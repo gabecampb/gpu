@@ -4,6 +4,7 @@
 #define MAX_VA_COUNT			16
 #define MAX_VA_STRIDE			2048
 #define MAX_COLOR_ATTACH_COUNT	8
+#define MAX_DTABLE_COUNT		4
 
 #define CMD_SET_REG_32		1
 #define CMD_SET_REG_64		2
@@ -23,6 +24,8 @@
 #define IDX_COUNT_REG		0xA4
 #define VBO_ADDR_REG		0xAC
 #define VBO_LEN_REG			0xB4
+#define DTBL_0_ADDR_REG		0xBC		/* MAX_DTABLE_COUNT */
+#define KERNEL_ADDR_REG		0xCC
 
 #define ENABLE_DEPTH_ATTACH_BIT	(1 << 31)
 #define ENABLE_VA_BIT		(1 << 31)
@@ -39,6 +42,8 @@
 #define VA_TYPE_F32			6
 
 #define IS_VALID_VA_TYPE(x)	(x <= 6)
+
+extern uint8_t cmd_regs[NUM_BYTES_CMD_REGS];
 
 typedef struct va_type {
 	uint32_t format;

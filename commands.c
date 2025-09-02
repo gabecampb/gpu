@@ -13,6 +13,11 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 	bind_program();
 	bind_fbo();
 
+	// before any command that might access descriptors, need to run
+	// bind_dtables() because it's assumed the dtables that will be accessed are
+	// configured by that point. done again after kernel/dtable address changes.
+	uint8_t need_dtable_bind = 1;
+
 	switch(op) {
 		case CMD_SET_REG_32: {
 			if(cmd + 14 > end) {
@@ -33,6 +38,10 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			uint64_t y1 = FB_CFG_REG, y2 = DEPTH_ATTACH_REG + 7;
 			if(check_overlap(x1, x2, y1, y2))
 				bind_fbo();
+
+			y1 = DTBL_0_ADDR_REG, y2 = KERNEL_ADDR_REG + 7;
+			if(check_overlap(x1, x2, y1, y2))
+				need_dtable_bind = 1;
 
 			return 14;
 		} case CMD_SET_REG_64: {
@@ -56,8 +65,17 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			if(check_overlap(x1, x2, y1, y2))
 				bind_fbo();
 
+			y1 = DTBL_0_ADDR_REG, y2 = KERNEL_ADDR_REG + 7;
+			if(check_overlap(x1, x2, y1, y2))
+				need_dtable_bind = 1;
+
 			return 18;
 		} case CMD_DRAW: {
+			if(need_dtable_bind) {
+				bind_dtables();
+				need_dtable_bind = 0;
+			}
+
 			uint64_t vbo_addr	= *(uint64_t*)(cmd_regs + VBO_ADDR_REG);
 			uint64_t vbo_len	= *(uint64_t*)(cmd_regs + VBO_LEN_REG);
 			uint64_t base_idx	= *(uint64_t*)(cmd_regs + BASE_IDX_REG);

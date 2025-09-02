@@ -61,6 +61,7 @@ void page_flip(uint64_t addr, uint8_t vsync_on) {
 	uint64_t next_vblank_ns = (now_ns / interval_ns + 1) * interval_ns;
 
 	// perform blit to display
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, obj->gl_buffer);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, page_flip_fbo);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

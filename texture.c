@@ -73,6 +73,7 @@ void upload_level(object_t* obj, uint32_t level, uint8_t* src) {
 	GLenum gl_type		= GET_FORMAT_GL_TYPE(hdr->tex_format);
 
 	GLenum target = get_tex_gl_target(hdr->n_dims);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(target, obj->gl_buffer);
 
 	uint32_t dims[3];
@@ -101,6 +102,7 @@ void download_level(object_t* obj, uint32_t level, uint8_t* dst) {
 	GLenum gl_type	= GET_FORMAT_GL_TYPE(hdr->tex_format);
 
 	GLenum target = get_tex_gl_target(hdr->n_dims);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(target, obj->gl_buffer);
 	glGetTexImage(target, level, gl_fmt, gl_type, dst);
 }
