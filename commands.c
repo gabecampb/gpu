@@ -86,6 +86,11 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			uint64_t base_idx	= *(uint64_t*)(cmd_regs + BASE_IDX_REG);
 			uint64_t idx_count	= *(uint64_t*)(cmd_regs + IDX_COUNT_REG);
 
+			if(vbo_len > VRAM_CAPACITY) {
+				WARN("length for vbo %llx too large, skipping command\n", vbo_addr);
+				return 2;
+			}
+
 			object_t* vbo = ref_buffer_precise(vbo_addr, TYPE_VBO, vbo_len);
 			if(!vbo) {
 				WARN("failed to get vbo %llx for draw, skipping command\n", vbo_addr);

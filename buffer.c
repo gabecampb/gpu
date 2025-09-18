@@ -426,9 +426,10 @@ void free_object(object_t* obj) {
 		mark_all_overlaps(obj->addr, obj->len);
 	}
 
-	if(obj->type == TYPE_VBO || obj->type == TYPE_IBO || obj->type == TYPE_TBO
-	|| obj->type == TYPE_UBO)
+	if(obj->type == TYPE_VBO || obj->type == TYPE_IBO || obj->type == TYPE_UBO)
 		glDeleteBuffers(1, &obj->gl_buffer);
+	if(obj->type == TYPE_TBO)
+		glDeleteTextures(1, &obj->gl_buffer);
 	if(obj->type == TYPE_VBO && obj->gl_vao) {
 		glDeleteVertexArrays(1, &obj->gl_vao);
 		free(obj->gl_va_cfgs);
