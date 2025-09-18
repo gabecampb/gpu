@@ -7,12 +7,14 @@
 #define LENGTH_IN_BUFFER -1
 #define ANY_LENGTH -2
 
-#define NUM_TYPES		5
+#define NUM_TYPES		7
 #define TYPE_CBO		1
 #define TYPE_VBO		2
 #define TYPE_IBO		3
 #define TYPE_TBO		4
 #define TYPE_DTBL		5
+#define TYPE_KERNEL		6
+#define TYPE_UBO		7
 #define IS_VALID_TYPE(x) (x != 0 && x <= NUM_TYPES)
 
 // internal copy of object header info
@@ -26,6 +28,8 @@ typedef struct header_t {
 	uint32_t dims[3];
 
 	uint16_t n_descriptors;
+
+	uint64_t kernel_len;
 } header_t;
 
 // internal representation of an object
@@ -41,6 +45,8 @@ typedef struct object_t {
 	int64_t refcount;
 
 	GLuint gl_buffer;
+
+	void* kernel_info;
 	GLuint gl_vao;
 	uint32_t* gl_va_cfgs;
 } object_t;

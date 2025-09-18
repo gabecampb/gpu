@@ -10,9 +10,6 @@ void bind_vao(object_t* vbo);
 void gl_set_draw_buffers(uint8_t bmp);
 
 uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
-	bind_program();
-	bind_fbo();
-
 	// before any command that might access descriptors, need to run
 	// bind_dtables() because it's assumed the dtables that will be accessed are
 	// configured by that point. done again after kernel/dtable address changes.
@@ -43,6 +40,10 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			if(check_overlap(x1, x2, y1, y2))
 				need_dtable_bind = 1;
 
+			y1 = KERNEL_ADDR_REG, y2 = KERNEL_ADDR_REG + 7;
+			if(check_overlap(x1, x2, y1, y2))
+				bind_kernel();
+
 			return 14;
 		} case CMD_SET_REG_64: {
 			if(cmd + 18 > end) {
@@ -68,6 +69,10 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			y1 = DTBL_0_ADDR_REG, y2 = KERNEL_ADDR_REG + 7;
 			if(check_overlap(x1, x2, y1, y2))
 				need_dtable_bind = 1;
+
+			y1 = KERNEL_ADDR_REG, y2 = KERNEL_ADDR_REG + 7;
+			if(check_overlap(x1, x2, y1, y2))
+				bind_kernel();
 
 			return 18;
 		} case CMD_DRAW: {

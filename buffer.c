@@ -181,10 +181,11 @@ void mark_all_overlaps(uint64_t addr, uint64_t len) {
 
 uint32_t get_header_length(uint8_t type) {
 	switch(type) {
-		case TYPE_CBO:	return 4;	break;
-		case TYPE_TBO:	return 14;	break;
-		case TYPE_DTBL:	return 2;	break;
-		default:		return 0;
+		case TYPE_CBO:		return 4;	break;
+		case TYPE_TBO:		return 14;	break;
+		case TYPE_DTBL:		return 2;	break;
+		case TYPE_KERNEL:	return 8;	break;
+		default:			return 0;
 	}
 }
 
@@ -238,6 +239,12 @@ uint64_t get_header_info(header_t* header, uint64_t addr, uint8_t type) {
 			if(!header->n_descriptors)
 				break;
 			len = header_len + (header->n_descriptors * 16);
+			break;
+		case TYPE_KERNEL:
+			header->kernel_len = *(uint64_t*)data;
+			if(!header->kernel_len)
+				break;
+			len = header_len + header->kernel_len;
 			break;
 	}
 
@@ -303,6 +310,13 @@ object_t* create_object(header_t* header, uint64_t addr, uint8_t type, uint64_t 
 		glBindTexture(get_tex_gl_target(obj->header.n_dims), obj->gl_buffer);
 		upload_texture(obj, data);
 	}
+	if(type == TYPE_KERNEL)
+		obj->kernel_info = calloc(1, sizeof(kernel_info_t));
+	if(type == TYPE_UBO) {
+		glGenBuffers(1, &obj->gl_buffer);
+		glBindBuffer(GL_UNIFORM_BUFFER, obj->gl_buffer);
+		glBufferData(GL_UNIFORM_BUFFER, obj->len, data, GL_STATIC_DRAW);
+	}
 
 	free(data);
 	return obj;
@@ -329,6 +343,9 @@ void object_read(object_t* obj, uint8_t* dst, uint64_t src, uint64_t n) {
 	} else if(obj->type == TYPE_IBO) {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->gl_buffer);
 		glGetBufferSubData(GL_ELEMENT_ARRAY_BUFFER, src - obj->addr, n, dst);
+	} else if(obj->type == TYPE_UBO) {
+		glBindBuffer(GL_UNIFORM_BUFFER, obj->gl_buffer);
+		glGetBufferSubData(GL_UNIFORM_BUFFER, src - obj->addr, n, dst);
 	} else if(obj->type == TYPE_TBO)
 		read_texture(obj, dst, src, n);
 	else
@@ -357,6 +374,9 @@ void object_write(object_t* obj, uint64_t dst, uint8_t* src, uint64_t n) {
 	} else if(obj->type == TYPE_IBO) {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->gl_buffer);
 		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, dst - obj->addr, n, src);
+	} else if(obj->type == TYPE_UBO) {
+		glBindBuffer(GL_UNIFORM_BUFFER, obj->gl_buffer);
+		glBufferSubData(GL_UNIFORM_BUFFER, dst - obj->addr, n, src);
 	} else if(obj->type == TYPE_TBO)
 		write_texture(obj, dst, src, n);
 }
@@ -406,12 +426,15 @@ void free_object(object_t* obj) {
 		mark_all_overlaps(obj->addr, obj->len);
 	}
 
-	if(obj->type == TYPE_VBO || obj->type == TYPE_IBO || obj->type == TYPE_TBO)
+	if(obj->type == TYPE_VBO || obj->type == TYPE_IBO || obj->type == TYPE_TBO
+	|| obj->type == TYPE_UBO)
 		glDeleteBuffers(1, &obj->gl_buffer);
 	if(obj->type == TYPE_VBO && obj->gl_vao) {
 		glDeleteVertexArrays(1, &obj->gl_vao);
 		free(obj->gl_va_cfgs);
 	}
+	if(obj->type == TYPE_KERNEL)
+		free_kernel(obj);
 	free(obj);
 }
 

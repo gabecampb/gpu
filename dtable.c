@@ -1,6 +1,6 @@
 #include "defs.h"
 
-void load_dtable(uint32_t dtbl_slot, desc_access_t* accesses) {
+void load_dtable(uint32_t dtbl_slot, node_t* accesses) {
 	uint64_t dtbl_addr = *(uint64_t*)(cmd_regs + DTBL_0_ADDR_REG + (dtbl_slot * 8));
 
 	object_t* dtbl = ref_buffer_precise(dtbl_addr, TYPE_DTBL, LENGTH_IN_BUFFER);
@@ -13,7 +13,8 @@ void load_dtable(uint32_t dtbl_slot, desc_access_t* accesses) {
 	data = gpu_read(data, dtbl->addr, dtbl->len);
 
 	// validate + load all descriptors accessed from the table
-	for(desc_access_t* d = accesses; d; d = d->next) {
+	for(node_t* node = accesses; node; node = node->next) {
+		desc_access_t* d = node->data;
 		if(d->table != dtbl_slot)
 			continue;
 
@@ -29,6 +30,13 @@ void load_dtable(uint32_t dtbl_slot, desc_access_t* accesses) {
 		object_t* obj = 0;
 		if(d->type == TYPE_TBO)
 			obj = ref_buffer_precise(addr, TYPE_TBO, LENGTH_IN_BUFFER);
+		if(d->type == TYPE_UBO) {
+			if(mdata == 0 || mdata % 16 || mdata > MAX_UBO_SIZE) {
+				WARN("invalid read-only buffer size for descriptor in table #%d\n", dtbl_slot);
+				return;
+			}
+			obj = ref_buffer_precise(addr, TYPE_UBO, mdata);
+		}
 
 		if(!obj) {
 			WARN("failed to reference object for descriptor access in table #%d\n", dtbl_slot);
@@ -91,6 +99,12 @@ void load_dtable(uint32_t dtbl_slot, desc_access_t* accesses) {
 				WARN("anisotropic filtering is not yet implemented!\n");
 
 			glUniform1i(d->bind_point.location, d->bind_point.tmu);
+		}
+		if(obj->type == TYPE_UBO) {
+			glUniformBlockBinding(get_gl_program(), d->bind_point.location,
+				d->bind_point.ubo_binding);
+			glBindBufferBase(GL_UNIFORM_BUFFER, d->bind_point.ubo_binding,
+				obj->gl_buffer);
 		}
 	}
 
