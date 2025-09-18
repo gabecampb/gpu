@@ -9,11 +9,12 @@
 #define MAX_UBO_COUNT	32
 #define MAX_TBO_COUNT	16
 
-#define N_OPS	4
+#define N_OPS	5
 #define OP_MOV	0
-#define OP_LD	1
-#define OP_STR	2
-#define OP_TEX	3
+#define OP_ULD	1
+#define OP_LD	2
+#define OP_STR	3
+#define OP_TEX	4
 
 typedef struct field_t {
 	uint32_t bit_start;
@@ -28,6 +29,7 @@ typedef struct ins_t {
 
 static ins_t ins_list[] = {
 	{ OP_MOV,	3, {{0,7}, {7,8}, {15,32}} },
+	{ OP_ULD,	3, {{0,7}, {7,8}, {15,8}} },
 	{ OP_LD,	5, {{0,7}, {7,8}, {15,1}, {16,2}, {18,64}} },
 	{ OP_STR,	5, {{0,7}, {7,1}, {8,2}, {10,64}, {74,8}} },
 	{ OP_TEX,	4, {{0,7}, {7,32}, {39,36}, {75,24}} }
@@ -45,6 +47,7 @@ typedef struct attrib_access_t {
 
 typedef struct kernel_info_t {
 	GLuint gl_program;
+	GLuint gl_uregs_ubo;
 	uint32_t table_accesses;
 	node_t* desc_accesses;
 
@@ -70,5 +73,6 @@ typedef struct stage_t {
 
 void bind_kernel();
 void free_kernel(object_t* obj);
+void load_uregs();
 
 #endif

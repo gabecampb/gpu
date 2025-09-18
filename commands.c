@@ -44,6 +44,10 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			if(check_overlap(x1, x2, y1, y2))
 				bind_kernel();
 
+			y1 = UNIFORM_0_REG, y2 = UNIFORM_0_REG + 127;
+			if(check_overlap(x1, x2, y1, y2))
+				load_uregs();
+
 			return 14;
 		} case CMD_SET_REG_64: {
 			if(cmd + 18 > end) {
@@ -73,6 +77,10 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			y1 = KERNEL_ADDR_REG, y2 = KERNEL_ADDR_REG + 7;
 			if(check_overlap(x1, x2, y1, y2))
 				bind_kernel();
+
+			y1 = UNIFORM_0_REG, y2 = UNIFORM_0_REG + 127;
+			if(check_overlap(x1, x2, y1, y2))
+				load_uregs();
 
 			return 18;
 		} case CMD_DRAW: {

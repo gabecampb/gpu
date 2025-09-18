@@ -56,6 +56,7 @@ void free_list(node_t* node) {
 void free_kernel(object_t* obj) {
 	kernel_info_t* info = obj->kernel_info;
 	glDeleteProgram(info->gl_program);
+	glDeleteBuffers(1, &info->gl_uregs_ubo);
 	free_list(info->desc_accesses);
 	free(info);
 }
@@ -120,6 +121,14 @@ void add_code_reg(code_t* code, uint8_t reg) {
 	add_code(code, "]");
 }
 
+void add_code_ureg(code_t* code, uint8_t reg) {
+	add_code(code, "u_regs[");
+	add_code_int(code, reg / 4);
+	add_code(code, "][");
+	add_code_int(code, reg % 4);
+	add_code(code, "]");
+}
+
 void add_code_buffer_ref(code_t* code, uint16_t table, uint16_t index) {
 	add_code(code, "buffer");
 	add_code_int(code, table);
@@ -130,7 +139,7 @@ void add_code_buffer_ref(code_t* code, uint16_t table, uint16_t index) {
 void add_code_buffer_imm_idx(code_t* code, uint32_t imm) {
 	add_code_int(code, imm / 16);
 	add_code(code, "][");
-	add_code_int(code, imm % 4);
+	add_code_int(code, imm / 4 % 4);
 }
 
 void add_code_buffer_reg_idx(code_t* code, uint8_t reg) {
@@ -207,6 +216,15 @@ uint8_t decode_ins(kernel_info_t* info, stage_t* stage, uint32_t offset, uint8_t
 		add_code(code, " = uintBitsToFloat(");
 		add_code_int(code, imm);
 		add_code(code, ");\n");
+	}
+
+	if(op == OP_ULD) {
+		uint64_t src = F(2), dst = F(1);
+
+		add_code_reg(code, dst);
+		add_code(code, " = ");
+		add_code_ureg(code, src);
+		add_code(code, ";\n");
 	}
 
 	if(op == OP_LD) {
@@ -463,7 +481,12 @@ uint8_t build_stage(kernel_info_t* info, stage_t* stage, uint8_t* src) {
 		"float local_mem["
 	);
 	add_code_int(&stage->globals, info->local_mem_size / 4);
-	add_code(&stage->globals, "];\n");
+	add_code(&stage->globals,
+		"];\n"
+		"uniform ureg_buffer {\n"
+		"	vec4 u_regs[8];\n"
+		"}\n"
+	);
 
 	add_code(&stage->code,
 		"void main() {\n"
@@ -479,6 +502,8 @@ uint8_t build_stage(kernel_info_t* info, stage_t* stage, uint8_t* src) {
 		}
 		offs += ins_len;
 	}
+
+	add_code(&stage->code, "}\n");
 
 	define_globals(info, stage);
 	return 0;
@@ -567,16 +592,19 @@ void build_kernel(object_t* obj) {
 
 	if(info.local_mem_size) {
 		WARN("kernel local memory size must be a multiple of 4\n");
+		free(data);
 		return;
 	}
 
 	if(n_stages != 2) {
 		WARN("kernel stage count must be 2\n");
+		free(data);
 		return;
 	}
 
 	if(n_buffers > MAX_UBO_COUNT) {
 		WARN("too many read-only buffers in kernel\n");
+		free(data);
 		return;
 	}
 
@@ -590,10 +618,11 @@ void build_kernel(object_t* obj) {
 		d->index = (buffer_info >> 32) & 0xFFFF;
 		d->buffer_size = buffer_info & 0xFFFFFFFF;
 
-		d->bind_point.ubo_binding = i;
+		d->bind_point.ubo_binding = i + 1;	// 0 is reserved for uregs_ubo
 
 		if(get_desc_in_list(info.desc_accesses, d->table, d->index)) {
 			WARN("duplicate read-only buffer description in kernel binary\n");
+			free(data);
 			free(d);
 			return;
 		}
@@ -601,6 +630,7 @@ void build_kernel(object_t* obj) {
 		if(d->buffer_size == 0 || d->buffer_size % 16
 		|| d->buffer_size > MAX_UBO_SIZE) {
 			WARN("invalid read-only buffer size in kernel binary\n");
+			free(data);
 			free(d);
 			return;
 		}
@@ -675,6 +705,10 @@ void build_kernel(object_t* obj) {
 		free(name.str);
 	}
 
+	glGenBuffers(1, &info.gl_uregs_ubo);
+	glBindBuffer(GL_UNIFORM_BUFFER, info.gl_uregs_ubo);
+	glBufferData(GL_UNIFORM_BUFFER, 128, NULL, GL_STATIC_DRAW);
+
 	obj->kernel_info = malloc(sizeof(kernel_info_t));
 	memcpy(obj->kernel_info, &info, sizeof(kernel_info_t));
 }
@@ -693,6 +727,23 @@ void bind_kernel() {
 
 	bound_kernel = obj->kernel_info;
 
-	if(bound_kernel)
+	if(bound_kernel) {
 		glUseProgram(bound_kernel->gl_program);
+
+		load_uregs();
+
+		GLuint idx = glGetUniformBlockIndex(bound_kernel->gl_program, "uregs_ubo");
+		glUniformBlockBinding(bound_kernel->gl_program, idx, 0);
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, bound_kernel->gl_uregs_ubo);
+	}
+}
+
+void load_uregs() {
+	if(!bound_kernel)
+		return;
+	uint8_t* data = malloc(128);
+	memcpy(data, cmd_regs + UNIFORM_0_REG, 128);
+	glBindBuffer(GL_UNIFORM_BUFFER, bound_kernel->gl_uregs_ubo);
+	glBufferData(GL_UNIFORM_BUFFER, 128, data, GL_STATIC_DRAW);
+	free(data);
 }

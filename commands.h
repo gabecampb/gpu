@@ -26,6 +26,7 @@
 #define VBO_LEN_REG			0xB4
 #define DTBL_0_ADDR_REG		0xBC		/* MAX_DTABLE_COUNT */
 #define KERNEL_ADDR_REG		0xCC
+#define UNIFORM_0_REG		0xD4		/* 128 bytes */
 
 #define ENABLE_DEPTH_ATTACH_BIT	(1 << 31)
 #define ENABLE_VA_BIT		(1 << 31)
