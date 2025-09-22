@@ -75,6 +75,10 @@ uint8_t ref_attrib(node_t** attrib_list, uint32_t stage_id, uint8_t attr_type,
 	uint8_t comp) {
 	for(node_t* node = *attrib_list; node; node = node->next) {
 		attrib_access_t* a = node->data;
+
+		if(stage_id == 1 && attr_type == ATTR_IN && a->id == id)
+			interp_type = a->interp_type;	// inherit vtx shader's interp_type
+
 		if(a->id != id || a->stage_id != stage_id)
 			continue;
 
@@ -113,6 +117,11 @@ void add_code_int(code_t* code, int64_t value) {
 	char str[32];
 	snprintf(str, 32, "%lld", value);
 	add_code(code, str);
+}
+
+void add_code_uint(code_t* code, uint64_t value) {
+	add_code_int(code, value);
+	add_code(code, "u");
 }
 
 void add_code_reg(code_t* code, uint8_t reg) {
@@ -179,10 +188,21 @@ uint64_t read_field(uint8_t* ptr, field_t field) {
 		ERROR("read_field(): field width is invalid\n");
 
 	uint64_t value = 0;
-	uint64_t mask = field.bit_count == 64 ? -1 : (1 << field.bit_count) - 1;
-	for(uint32_t i = 0; i < (field.bit_count + 7) / 8; i++)
-		value |= ((uint64_t)ptr[i] << (i * 8)) & (mask >> (i*8));
+	uint8_t* val = &value;
+	uint32_t bit_end = field.bit_start + field.bit_count - 1;
+	uint32_t n_bytes = (bit_end / 8) - (field.bit_start / 8) + 1;
 
+	ptr += field.bit_start / 8;
+
+	for(uint32_t i = 0; i < n_bytes; i++) {
+		uint32_t s = field.bit_start % 8;
+
+		val[i] |= ptr[i] >> s;
+		if(i + 1 < n_bytes)
+			val[i] |= ptr[i+1] << (8-s);
+	}
+
+	value &= field.bit_count == 64 ? -1 : (1ull << field.bit_count) - 1;
 	return value;
 }
 
@@ -214,7 +234,7 @@ uint8_t decode_ins(kernel_info_t* info, stage_t* stage, uint32_t offset, uint8_t
 
 		add_code_reg(code, dst);
 		add_code(code, " = uintBitsToFloat(");
-		add_code_int(code, imm);
+		add_code_uint(code, imm);
 		add_code(code, ");\n");
 	}
 
@@ -327,7 +347,12 @@ uint8_t decode_ins(kernel_info_t* info, stage_t* stage, uint32_t offset, uint8_t
 		uint16_t table = (src >> 20) & 0xFFFF;
 		uint16_t index = (src >> 4) & 0xFFFF;
 		uint32_t sample_type = (src >> 2) & 0x3;
-		uint32_t n_dims = (src & 0x3) + 1;
+		uint32_t n_dims = src & 0x3;
+
+		if(n_dims == 0) {
+			WARN("invalid dimension count field\n");
+			return 0;
+		}
 
 		if(sample_type > 2) {
 			WARN("invalid sample type field\n");
@@ -378,14 +403,14 @@ uint8_t decode_ins(kernel_info_t* info, stage_t* stage, uint32_t offset, uint8_t
 		}
 		add_code(code, "));\n");
 
-		for(uint32_t i = 0; i < d->n_dims; i++) {
-			add_code_reg(code, (tc >> (i*8)) & 0xFF);
+		for(uint32_t i = 0; i < 4; i++) {
+			add_code_reg(code, (dst >> (i*8)) & 0xFF);
 			add_code(code, " = ");
 			if(d->sample_type == 1)	add_code(code, "intBitsToFloat(");
 			if(d->sample_type == 2)	add_code(code, "uintBitsToFloat(");
 			add_code(code, "t");
 			add_code_int(code, info->n_sampling_calls);
-			char component[] = { '.', "xyz"[i], '\0' };
+			char component[] = { '.', "rgba"[i], '\0' };
 			add_code(code, component);
 			if(d->sample_type != 0)
 				add_code(code, ")");
@@ -393,6 +418,18 @@ uint8_t decode_ins(kernel_info_t* info, stage_t* stage, uint32_t offset, uint8_t
 		}
 
 		info->n_sampling_calls++;
+	}
+
+	if(op == OP_VOUT) {
+		uint64_t src = F(1);
+
+		add_code(code, "gl_Position = vec4(");
+		for(uint32_t i = 0; i < 4; i++) {
+			add_code_reg(code, (src >> (i*8)) & 0xFF);
+			if(i + 1 < 4)
+				add_code(code, ", ");
+		}
+		add_code(code, ");\n");
 	}
 
 	return ins_width;
@@ -414,11 +451,12 @@ void define_globals(kernel_info_t* info, stage_t* stage) {
 			add_code(globals, ") ");
 		}
 
-		if(stage->id == 0 && a->attr_type == ATTR_OUT)
+		if((stage->id == 0 && a->attr_type == ATTR_OUT)
+		|| (stage->id == 1 && a->attr_type == ATTR_IN))
 			switch(a->interp_type) {
-				case 0: add_code(globals, "flat ");    break;
-				case 1: add_code(globals, "smooth ");  break;
-				case 2: add_code(globals, "nopersp "); break;
+				case 0: add_code(globals, "flat ");   break;
+				case 1: add_code(globals, "smooth "); break;
+				case 2: add_code(globals, "noperspective "); break;
 			}
 
 		if(a->attr_type == ATTR_IN)
@@ -478,19 +516,19 @@ void define_globals(kernel_info_t* info, stage_t* stage) {
 uint8_t build_stage(kernel_info_t* info, stage_t* stage, uint8_t* src) {
 	add_code(&stage->globals,
 		"#version 330 core\n"
-		"float local_mem["
 	);
-	add_code_int(&stage->globals, info->local_mem_size / 4);
+	if(info->local_mem_size) {
+		add_code(&stage->globals, "float local_mem[");
+		add_code_int(&stage->globals, info->local_mem_size / 4);
+		add_code(&stage->globals, "];\n");
+	}
 	add_code(&stage->globals,
-		"];\n"
-		"uniform ureg_buffer {\n"
-		"	vec4 u_regs[8];\n"
-		"}\n"
+		"uniform ureg_buffer { vec4 u_regs[8]; };\n"
 	);
 
 	add_code(&stage->code,
 		"void main() {\n"
-		"	float regs[256];\n"
+		"float regs[256];\n"
 	);
 
 	uint32_t offs = 0;
@@ -566,6 +604,7 @@ GLuint build_program(stage_t* v_stage, stage_t* f_stage) {
 
 	if(!status) {
 		WARN("failed to link program\n");
+		glDeleteProgram(gl_program);
 		return 0;
 	}
 
@@ -590,7 +629,7 @@ void build_kernel(object_t* obj) {
 	info.local_mem_size		= *(uint32_t*)(data + 12);
 	uint32_t n_buffers		= *(uint32_t*)(data + 16);
 
-	if(info.local_mem_size) {
+	if(info.local_mem_size % 4) {
 		WARN("kernel local memory size must be a multiple of 4\n");
 		free(data);
 		return;
@@ -622,6 +661,7 @@ void build_kernel(object_t* obj) {
 
 		if(get_desc_in_list(info.desc_accesses, d->table, d->index)) {
 			WARN("duplicate read-only buffer description in kernel binary\n");
+			free_list(info.desc_accesses);
 			free(data);
 			free(d);
 			return;
@@ -630,6 +670,7 @@ void build_kernel(object_t* obj) {
 		if(d->buffer_size == 0 || d->buffer_size % 16
 		|| d->buffer_size > MAX_UBO_SIZE) {
 			WARN("invalid read-only buffer size in kernel binary\n");
+			free_list(info.desc_accesses);
 			free(data);
 			free(d);
 			return;
@@ -657,6 +698,8 @@ void build_kernel(object_t* obj) {
 		if(error) {
 			free_stage(&stages[0]);
 			free_stage(&stages[1]);
+			free_list(info.desc_accesses);
+			free_list(info.attrib_accesses);
 			free(data);
 			return;
 		}
@@ -668,17 +711,18 @@ void build_kernel(object_t* obj) {
 
 	free_stage(&stages[0]);
 	free_stage(&stages[1]);
-	free(data);
 	free_list(info.attrib_accesses);
 	info.attrib_accesses = 0;
+	free(data);
 
 	if(!info.gl_program) {
 		WARN("failed to build program\n");
+		free_list(info.desc_accesses);
 		return;
 	}
 
 	// set bind_point of each descriptor to GL-assigned location
-	for(node_t* node = info.desc_accesses; node; node = node->next) {
+	for(node_t* node = info.desc_accesses, tmp; node; node = node->next) {
 		desc_access_t* d = node->data;
 
 		code_t name;
@@ -687,8 +731,11 @@ void build_kernel(object_t* obj) {
 			add_code_tex_ref(&name, d->table, d->index);
 
 			GLint loc = glGetUniformLocation(info.gl_program, name.str);
-			if(loc == -1)	// shouldn't happen, but play it safe
+			if(loc == -1) {	// shouldn't happen, but play it safe
+				tmp.next = node->next;
 				remove_from_list(&info.desc_accesses, node);
+				node = &tmp;
+			}
 
 			d->bind_point.location = loc;
 		} else if(d->type == TYPE_UBO) {
@@ -697,8 +744,11 @@ void build_kernel(object_t* obj) {
 			add_code_int(&name, d->index);
 
 			GLuint idx = glGetUniformBlockIndex(info.gl_program, name.str);
-			if(idx == GL_INVALID_INDEX)	// may happen if declared but not used
+			if(idx == GL_INVALID_INDEX) { // may happen if declared but not used
+				tmp.next = node->next;
 				remove_from_list(&info.desc_accesses, node);
+				node = &tmp;
+			}
 
 			d->bind_point.location = idx;
 		}

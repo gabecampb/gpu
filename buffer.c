@@ -311,7 +311,7 @@ object_t* create_object(header_t* header, uint64_t addr, uint8_t type, uint64_t 
 		upload_texture(obj, data);
 	}
 	if(type == TYPE_KERNEL)
-		obj->kernel_info = calloc(1, sizeof(kernel_info_t));
+		obj->kernel_info = 0;
 	if(type == TYPE_UBO) {
 		glGenBuffers(1, &obj->gl_buffer);
 		glBindBuffer(GL_UNIFORM_BUFFER, obj->gl_buffer);
