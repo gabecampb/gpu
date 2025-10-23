@@ -305,7 +305,7 @@ object_t* create_object(header_t* header, uint64_t addr, uint8_t type, uint64_t 
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, obj->len, data, GL_STATIC_DRAW);
 	}
 	if(type == TYPE_TBO) {
-		glGenBuffers(1, &obj->gl_buffer);
+		glGenTextures(1, &obj->gl_buffer);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(get_tex_gl_target(obj->header.n_dims), obj->gl_buffer);
 		upload_texture(obj, data);
