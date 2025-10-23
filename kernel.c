@@ -783,8 +783,10 @@ void bind_kernel() {
 		load_uregs();
 
 		GLuint idx = glGetUniformBlockIndex(bound_kernel->gl_program, "uregs_ubo");
-		glUniformBlockBinding(bound_kernel->gl_program, idx, 0);
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, bound_kernel->gl_uregs_ubo);
+		if(idx != GL_INVALID_INDEX) {
+			glUniformBlockBinding(bound_kernel->gl_program, idx, 0);
+			glBindBufferBase(GL_UNIFORM_BUFFER, 0, bound_kernel->gl_uregs_ubo);
+		}
 	}
 }
 
