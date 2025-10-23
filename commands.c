@@ -1,4 +1,4 @@
-#include "defs.h"
+#include "../../defs.h"
 
 GLuint gl_fbo;
 uint32_t fbo_dims[2];

@@ -1,7 +1,7 @@
 #ifndef TEXTURE_H
 #define TEXTURE_H
 
-#include "defs.h"
+#include "../../defs.h"
 
 #define MAX_1D_TEXTURE_DIM	8192
 #define MAX_2D_TEXTURE_DIM	8192

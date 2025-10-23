@@ -1,7 +1,29 @@
-#ifndef GPU_H
-#define GPU_H
+#ifndef _GPU_H
+#define _GPU_H
 
-#include "defs.h"
+#include "../../defs.h"
+
+void gpu_registers_update(void*, uint64_t, uint64_t);
+void issue_batch();
+
+// defined externally
+void page_flip_irq();
+void dma_read_complete_irq();
+void dma_write_complete_irq();
+void gpu_controller();
+
+#define ERROR(...) { printf("fatal error: "); printf(__VA_ARGS__); exit(1); }
+#define WARN(...) printf(__VA_ARGS__)
+#define LOG(...) printf(__VA_ARGS__)
+
+#include "mem.h"
+#include "buffer.h"
+#include "texture.h"
+#include "dtable.h"
+#include "kernel.h"
+#include "commands.h"
+#include "flip.h"
+#include "copy.h"
 
 #define GPU_REGS_LOW  0x26000
 #define GPU_REGS_HIGH 0x26FFF
@@ -34,7 +56,5 @@
 // copy control register flags
 #define REQUEST_READ_BIT (1 << 31)
 #define REQUEST_WRITE_BIT (1 << 31)
-
-void gpu_registers_update(uint64_t, uint64_t);
 
 #endif

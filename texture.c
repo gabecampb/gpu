@@ -1,4 +1,4 @@
-#include "defs.h"
+#include "../../defs.h"
 
 GLenum get_tex_gl_target(uint8_t n_dims) {
 	switch(n_dims) {

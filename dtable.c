@@ -1,4 +1,4 @@
-#include "defs.h"
+#include "../../defs.h"
 
 void load_dtable(uint32_t dtbl_slot, node_t* accesses) {
 	uint64_t dtbl_addr = *(uint64_t*)(cmd_regs + DTBL_0_ADDR_REG + (dtbl_slot * 8));

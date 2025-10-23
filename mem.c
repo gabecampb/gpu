@@ -1,7 +1,6 @@
-#include "defs.h"
+#include "../../defs.h"
 
 uint8_t vram[VRAM_CAPACITY];
-pthread_mutex_t atomic_rw_mx = PTHREAD_MUTEX_INITIALIZER;
 
 #define MATCH_LOWEST 0
 #define MATCH_HIGHEST 1
@@ -169,17 +168,4 @@ void gpu_write(uint64_t dst, uint8_t* src, uint64_t n) {
 
 void gpu_write_oldest(uint64_t dst, uint8_t* src, uint64_t n) {
 	__gpu_write(dst, src, n, MATCH_LOWEST);
-}
-
-uint64_t a_read_u64(uint64_t* value) {
-	pthread_mutex_lock(&atomic_rw_mx);
-	uint64_t x = *value;
-	pthread_mutex_unlock(&atomic_rw_mx);
-	return x;
-}
-
-void a_write_u64(uint64_t* value, uint64_t new_value) {
-	pthread_mutex_lock(&atomic_rw_mx);
-	*value = new_value;
-	pthread_mutex_unlock(&atomic_rw_mx);
 }

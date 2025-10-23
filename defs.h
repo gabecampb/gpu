@@ -1,6 +1,9 @@
 #ifndef DEFS_H
 #define DEFS_H
 
+#define RAM_CAPACITY 0x4000000
+#define NS_PER_SEC 1000000000
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,31 +11,18 @@
 #include <time.h>
 #include <math.h>
 #include <pthread.h>
-
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <GLFW/glfw3.h>
 
-extern uint8_t ram[];
-extern GLFWwindow* window;
-void atomic_set(uint8_t* ptr, uint8_t value);
-uint8_t atomic_get(uint8_t* ptr);
+GLFWwindow* get_window();
+uint8_t* get_ram();
+uint8_t atomic_get_u8(uint8_t*);
+uint64_t atomic_get_u64(uint64_t*);
+void atomic_set_u8(uint8_t*, uint8_t);
+void atomic_set_u64(uint64_t*, uint64_t);
 
-#include "mem.h"
-#include "buffer.h"
-#include "texture.h"
-#include "dtable.h"
-#include "kernel.h"
-#include "commands.h"
-#include "flip.h"
-#include "copy.h"
 #include "gpu.h"
-
-#define ERROR(...) { printf("fatal error: "); printf(__VA_ARGS__); exit(1); }
-#define WARN(...) printf(__VA_ARGS__)
-#define LOG(...) printf(__VA_ARGS__)
-
-#define NS_PER_SEC 1000000000
 
 #endif

@@ -1,4 +1,4 @@
-#include "defs.h"
+#include "../../defs.h"
 
 bucket_t bo_bucket[VRAM_CAPACITY / BO_BUCKET_SIZE];
 

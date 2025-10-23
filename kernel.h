@@ -1,7 +1,7 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include "defs.h"
+#include "../../defs.h"
 
 #define ATTR_IN  0
 #define ATTR_OUT 1

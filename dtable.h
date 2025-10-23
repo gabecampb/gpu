@@ -1,7 +1,7 @@
 #ifndef DTABLE_H
 #define DTABLE_H
 
-#include "defs.h"
+#include "../../defs.h"
 
 #define MAX_UBO_SIZE	0x4000
 

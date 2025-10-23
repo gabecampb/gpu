@@ -1,16 +1,12 @@
-#include "defs.h"
+#include "../../defs.h"
 
 GLuint page_flip_fbo;
 
 pthread_t vblank_wait_thread;
 uint64_t curr_wait_ns, suppress_vsync_irq;
 
-void issue_page_flip_irq() {
-	// stub for page flip completion IRQs
-}
-
 void* vblank_wait_func(void* args) {
-	uint64_t wait_to = a_read_u64(&curr_wait_ns);
+	uint64_t wait_to = atomic_get_u64(&curr_wait_ns);
 
 	struct timespec tm;
 	tm.tv_sec	= wait_to / NS_PER_SEC;
@@ -18,8 +14,8 @@ void* vblank_wait_func(void* args) {
 
 	clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &tm, NULL);
 
-	if(!a_read_u64(&suppress_vsync_irq) && a_read_u64(&curr_wait_ns) == wait_to)
-		issue_page_flip_irq();
+	if(!atomic_get_u64(&suppress_vsync_irq) && atomic_get_u64(&curr_wait_ns) == wait_to)
+		page_flip_irq();
 }
 
 void page_flip(uint64_t addr, uint8_t vsync_on) {
@@ -66,25 +62,25 @@ void page_flip(uint64_t addr, uint8_t vsync_on) {
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, page_flip_fbo);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	int w, h;
-	glfwGetWindowSize(window, &w, &h);
+	glfwGetWindowSize(get_window(), &w, &h);
 	glBlitFramebuffer(0, obj->header.dims[1], obj->header.dims[0], 0, 0, 0,
 		w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 	// send page flip completion IRQ
 	if(vsync_on) {
-		a_write_u64(&suppress_vsync_irq, 0);
-		if(a_read_u64(&curr_wait_ns) < next_vblank_ns) {
-			a_write_u64(&curr_wait_ns, next_vblank_ns);
+		atomic_set_u64(&suppress_vsync_irq, 0);
+		if(atomic_get_u64(&curr_wait_ns) < next_vblank_ns) {
+			atomic_set_u64(&curr_wait_ns, next_vblank_ns);
 
 			pthread_create(&vblank_wait_thread, NULL, vblank_wait_func, NULL);
 			pthread_detach(vblank_wait_thread);
 		}
 	} else if(!vsync_on) {		// if vsync is off, page flip is immediate
-		a_write_u64(&suppress_vsync_irq, 1);
-		issue_page_flip_irq();
+		atomic_set_u64(&suppress_vsync_irq, 1);
+		page_flip_irq();
 	}
 
 	glfwSwapInterval(vsync_on > 0);
-	glfwSwapBuffers(window);
+	glfwSwapBuffers(get_window());
 	glfwPollEvents();
 }

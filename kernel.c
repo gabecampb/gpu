@@ -1,4 +1,4 @@
-#include "defs.h"
+#include "../../defs.h"
 
 kernel_info_t* bound_kernel;
 

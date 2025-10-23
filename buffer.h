@@ -1,7 +1,7 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
-#include "defs.h"
+#include "../../defs.h"
 
 #define BO_BUCKET_SIZE 4096
 #define LENGTH_IN_BUFFER -1
