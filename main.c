@@ -3,7 +3,6 @@
 uint8_t ram[RAM_CAPACITY];
 
 GLFWwindow* window;
-uint16_t window_width, window_height;
 pthread_mutex_t atomic_rw_mx = PTHREAD_MUTEX_INITIALIZER;
 
 void gpu_controller()			{ issue_batch(); }
@@ -53,11 +52,6 @@ void init_glfw() {
 	window = glfwCreateWindow(640, 480, "GPU output", NULL, NULL);
 	if(!window)
 		ERROR("failed to create window\n");
-
-	int w, h;
-	glfwGetWindowSize(window, &w, &h);
-	window_width  = w;
-	window_height = h;
 
 	glfwMakeContextCurrent(window);
 	glClearColor(0., 0., 0., 1.);

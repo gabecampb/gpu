@@ -62,7 +62,7 @@ void page_flip(uint64_t addr, uint8_t vsync_on) {
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, page_flip_fbo);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	int w, h;
-	glfwGetWindowSize(get_window(), &w, &h);
+	glfwGetFramebufferSize(get_window(), &w, &h);
 	glBlitFramebuffer(0, obj->header.dims[1], obj->header.dims[0], 0, 0, 0,
 		w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
