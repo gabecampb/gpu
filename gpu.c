@@ -67,11 +67,11 @@ void issue_batch() {
 	*read_ptr += *read_len;
 	*ctrl &= ~DOORBELL_BIT;
 	if(*ring_addr % 16384) {
-		WARN("DMA ring address %llx misaligned, skip doorbell ring\n", ring_addr);
+		WARN("DMA ring address %llx misaligned, skip doorbell ring\n", *ring_addr);
 		return;
 	}
 	if(*ring_addr + 16384 - 1 >= RAM_CAPACITY) {
-		WARN("DMA ring address %llx out of bounds, skip doorbell ring\n", ring_addr);
+		WARN("DMA ring address %llx out of bounds, skip doorbell ring\n", *ring_addr);
 		return;
 	}
 
