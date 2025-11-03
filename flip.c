@@ -22,14 +22,17 @@ void page_flip(uint64_t addr, uint8_t vsync_on) {
 	object_t* obj = ref_buffer_precise(addr, TYPE_TBO, LENGTH_IN_BUFFER);
 	if(!obj) {
 		WARN("page_flip: failed to get texture object at %llx\n", addr);
+		page_flip_irq();
 		return;
 	}
 	if(obj->header.n_dims != 2) {
 		WARN("page_flip: texture object %llx was not 2D\n", obj->addr);
+		page_flip_irq();
 		return;
 	}
 	if(!IS_COLOR_FORMAT(obj->header.tex_format)) {
 		WARN("page_flip: texture object %llx was not of color format\n", obj->addr);
+		page_flip_irq();
 		return;
 	}
 
@@ -43,6 +46,7 @@ void page_flip(uint64_t addr, uint8_t vsync_on) {
 	GLenum status = glCheckFramebufferStatus(GL_READ_FRAMEBUFFER);
 	if(status != GL_FRAMEBUFFER_COMPLETE) {
 		WARN("page_flip: read framebuffer was incomplete\n");
+		page_flip_irq();
 		return;
 	}
 
