@@ -188,7 +188,7 @@ uint64_t read_field(uint8_t* ptr, field_t field) {
 		ERROR("read_field(): field width is invalid\n");
 
 	uint64_t value = 0;
-	uint8_t* val = &value;
+	uint8_t tmp[9] = {0};
 	uint32_t bit_end = field.bit_start + field.bit_count - 1;
 	uint32_t n_bytes = (bit_end / 8) - (field.bit_start / 8) + 1;
 
@@ -197,10 +197,12 @@ uint64_t read_field(uint8_t* ptr, field_t field) {
 	for(uint32_t i = 0; i < n_bytes; i++) {
 		uint32_t s = field.bit_start % 8;
 
-		val[i] |= ptr[i] >> s;
+		tmp[i] |= ptr[i] >> s;
 		if(i + 1 < n_bytes)
-			val[i] |= ptr[i+1] << (8-s);
+			tmp[i] |= ptr[i+1] << (8-s);
 	}
+
+	memcpy(&value, tmp, 8);
 
 	value &= field.bit_count == 64 ? -1 : (1ull << field.bit_count) - 1;
 	return value;
