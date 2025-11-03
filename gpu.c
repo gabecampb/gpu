@@ -100,10 +100,10 @@ void gpu_registers_update(void* cpu, uint64_t start, uint64_t length) {
 	}
 
 	if(*ctrl & DOORBELL_BIT)
-		gpu_controller();
+		gpu_batch();
 
 	if(*scan_ctrl & PAGE_FLIP_BIT) {
 		*scan_ctrl &= ~PAGE_FLIP_BIT;
-		page_flip(*scan_tbo, (*scan_ctrl & VSYNC_ON_BIT) > 0);
+		gpu_flip(*scan_tbo, (*scan_ctrl & VSYNC_ON_BIT) > 0);
 	}
 }

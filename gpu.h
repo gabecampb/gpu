@@ -10,7 +10,8 @@ void issue_batch();
 void page_flip_irq();
 void dma_read_complete_irq();
 void dma_write_complete_irq();
-void gpu_controller();
+void gpu_flip(uint64_t, uint8_t);
+void gpu_batch();
 
 #define ERROR(...) { printf("fatal error: "); printf(__VA_ARGS__); exit(1); }
 #define WARN(...) printf(__VA_ARGS__)
