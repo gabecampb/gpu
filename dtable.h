@@ -4,6 +4,7 @@
 #include "../../defs.h"
 
 #define MAX_UBO_SIZE	0x4000
+#define MAX_SBO_SIZE	0x8000000
 
 typedef struct node_t {
 	void* data;
@@ -12,8 +13,7 @@ typedef struct node_t {
 
 typedef struct desc_binding_t {
 	GLuint location;
-	GLuint tmu;
-	GLuint ubo_binding;
+	GLuint binding;
 } desc_binding_t;
 
 typedef struct desc_access_t {

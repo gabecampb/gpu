@@ -48,8 +48,8 @@ void init_glfw() {
 	if(!glfwInit())
 		ERROR("failed to initialize glfw\n");
 
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	window = glfwCreateWindow(640, 480, "GPU output", NULL, NULL);
 	if(!window)
 		ERROR("failed to create window\n");

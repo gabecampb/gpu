@@ -7,7 +7,7 @@
 #define LENGTH_IN_BUFFER -1
 #define ANY_LENGTH -2
 
-#define NUM_TYPES		7
+#define NUM_TYPES		8
 #define TYPE_CBO		1
 #define TYPE_VBO		2
 #define TYPE_IBO		3
@@ -15,6 +15,7 @@
 #define TYPE_DTBL		5
 #define TYPE_KERNEL		6
 #define TYPE_UBO		7
+#define TYPE_SBO		8
 #define IS_VALID_TYPE(x) (x != 0 && x <= NUM_TYPES)
 
 // internal copy of object header info

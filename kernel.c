@@ -70,6 +70,17 @@ desc_access_t* get_desc_in_list(node_t* desc_list, uint16_t table, uint16_t inde
 	return 0;
 }
 
+uint8_t ref_storage_buffer(kernel_info_t* info, uint16_t table, uint16_t index) {
+	desc_access_t* d = malloc(sizeof(desc_access_t));
+	d->type  = TYPE_SBO;
+	d->table = table;
+	d->index = index;
+	static uint32_t n = 0;
+	d->bind_point.binding = n++;
+	add_to_list(&info->desc_accesses, d);
+	info->table_accesses |= 1 << table;
+}
+
 uint8_t ref_attrib(node_t** attrib_list, uint32_t stage_id, uint8_t attr_type,
 	uint16_t id, uint8_t interp_type, uint8_t comp_type, uint8_t comp_count,
 	uint8_t comp) {
@@ -259,10 +270,9 @@ uint8_t decode_ins(kernel_info_t* info, stage_t* stage, uint32_t offset, uint8_t
 			uint16_t table = src >> 48;
 			uint16_t index = (src >> 32) & 0xFFFF;
 
-			if(!get_desc_in_list(info->desc_accesses, table, index)) {
-				WARN("buffer referenced not in kernel binary's list of buffers\n");
-				return 0;
-			}
+			if(!get_desc_in_list(info->desc_accesses, table, index))
+				ref_storage_buffer(&info->desc_accesses, table, index);
+
 			add_code_buffer_ref(code, table, index);
 			if(si)	add_code_buffer_imm_idx(code, src & 0xFFFFFFFF);
 			else	add_code_buffer_reg_idx(code, src & 0xFF);
@@ -377,7 +387,7 @@ uint8_t decode_ins(kernel_info_t* info, stage_t* stage, uint32_t offset, uint8_t
 
 			add_to_list(&info->desc_accesses, d);
 			info->table_accesses |= 1 << table;
-			d->bind_point.tmu = ++info->n_tmus_occupied;
+			d->bind_point.binding = ++info->n_tmus_occupied;
 		} else if(d->type != TYPE_TBO || d->n_dims != n_dims
 			|| d->sample_type != sample_type) {
 			WARN("sampled incompatible descriptor\n");
@@ -499,7 +509,7 @@ void define_globals(kernel_info_t* info, stage_t* stage) {
 			}
 			add_code_tex_ref(globals, d->table, d->index);
 			add_code(globals, ";\n");
-		} else if(d->type == TYPE_UBO) {
+		} else if(d->type == TYPE_UBO || d->type == TYPE_SBO) {
 			add_code(globals, "buffer");
 			add_code_int(globals, d->table);
 			add_code_int(globals, d->index);
@@ -509,7 +519,8 @@ void define_globals(kernel_info_t* info, stage_t* stage) {
 			add_code_int(globals, d->table);
 			add_code_int(globals, d->index);
 			add_code(globals, "_data[");
-			add_code_int(globals, d->buffer_size / 16);
+			if(d->type == TYPE_UBO)
+				add_code_int(globals, d->buffer_size / 16);
 			add_code(globals, "];\n};\n");
 		}
 	}
@@ -659,7 +670,7 @@ void build_kernel(object_t* obj) {
 		d->index = (buffer_info >> 32) & 0xFFFF;
 		d->buffer_size = buffer_info & 0xFFFFFFFF;
 
-		d->bind_point.ubo_binding = i + 1;	// 0 is reserved for uregs_ubo
+		d->bind_point.binding = i + 1;	// 0 is reserved for uregs_ubo
 
 		if(get_desc_in_list(info.desc_accesses, d->table, d->index)) {
 			WARN("duplicate read-only buffer description in kernel binary\n");
@@ -740,12 +751,13 @@ void build_kernel(object_t* obj) {
 			}
 
 			d->bind_point.location = loc;
-		} else if(d->type == TYPE_UBO) {
+		} else if(d->type == TYPE_UBO || d->type == TYPE_SBO) {
 			add_code(&name, "buffer");
 			add_code_int(&name, d->table);
 			add_code_int(&name, d->index);
 
-			GLuint idx = glGetUniformBlockIndex(info.gl_program, name.str);
+			GLuint idx = glGetProgramResourceIndex(info.gl_program, d->type ==
+				TYPE_UBO ? GL_UNIFORM_BLOCK : GL_SHADER_STORAGE_BLOCK, name.str);
 			if(idx == GL_INVALID_INDEX) { // may happen if declared but not used
 				tmp.next = node->next;
 				remove_from_list(&info.desc_accesses, node);

@@ -28,15 +28,17 @@ void load_dtable(uint32_t dtbl_slot, node_t* accesses) {
 
 		// reference the object as type d->type
 		object_t* obj = 0;
-		if(d->type == TYPE_TBO)
-			obj = ref_buffer_precise(addr, TYPE_TBO, LENGTH_IN_BUFFER);
-		if(d->type == TYPE_UBO) {
-			if(mdata == 0 || mdata % 16 || mdata > MAX_UBO_SIZE) {
-				WARN("invalid read-only buffer size for descriptor in table #%d\n", dtbl_slot);
+		if(d->type == TYPE_UBO || d->type == TYPE_SBO) {
+			uint64_t max_size =
+				d->type == TYPE_UBO ? MAX_UBO_SIZE : MAX_SBO_SIZE;
+			if(mdata == 0 || mdata % 16 || mdata > max_size) {
+				WARN("invalid buffer size for descriptor in table #%d\n", dtbl_slot);
 				return;
 			}
-			obj = ref_buffer_precise(addr, TYPE_UBO, mdata);
+			obj = ref_buffer_precise(addr, d->type, mdata);
 		}
+		if(d->type == TYPE_TBO)
+			obj = ref_buffer_precise(addr, TYPE_TBO, LENGTH_IN_BUFFER);
 
 		if(!obj) {
 			WARN("failed to reference object for descriptor access in table #%d\n", dtbl_slot);
@@ -49,10 +51,22 @@ void load_dtable(uint32_t dtbl_slot, node_t* accesses) {
 		}
 
 		// bind obj->gl_buffer using info recorded in d->bind_point
+		if(obj->type == TYPE_UBO) {
+			glUniformBlockBinding(get_gl_program(), d->bind_point.location,
+				d->bind_point.binding);
+			glBindBufferBase(GL_UNIFORM_BUFFER, d->bind_point.binding,
+				obj->gl_buffer);
+		}
+		if(obj->type == TYPE_SBO) {
+			glShaderStorageBlockBinding(get_gl_program(), d->bind_point.location,
+				d->bind_point.binding);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, d->bind_point.binding,
+				obj->gl_buffer);
+		}
 		if(obj->type == TYPE_TBO) {
 			GLenum target = get_tex_gl_target(obj->header.n_dims);
 
-			glActiveTexture(GL_TEXTURE0 + d->bind_point.tmu);
+			glActiveTexture(GL_TEXTURE0 + d->bind_point.binding);
 			glBindTexture(target, obj->gl_buffer);
 
 			GLenum min_filter;
@@ -98,13 +112,7 @@ void load_dtable(uint32_t dtbl_slot, node_t* accesses) {
 			if(max_aniso > 1)
 				WARN("anisotropic filtering is not yet implemented!\n");
 
-			glUniform1i(d->bind_point.location, d->bind_point.tmu);
-		}
-		if(obj->type == TYPE_UBO) {
-			glUniformBlockBinding(get_gl_program(), d->bind_point.location,
-				d->bind_point.ubo_binding);
-			glBindBufferBase(GL_UNIFORM_BUFFER, d->bind_point.ubo_binding,
-				obj->gl_buffer);
+			glUniform1i(d->bind_point.location, d->bind_point.binding);
 		}
 	}
 
