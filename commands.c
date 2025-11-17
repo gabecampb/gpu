@@ -155,6 +155,10 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 void command_decoder(uint8_t* commands, uint64_t len) {
 	uint8_t* end = commands + len - 1;
 
+	memset(cmd_regs, 0, NUM_BYTES_CMD_REGS);
+	bind_fbo();
+	set_raster_states();
+
 	while(commands < end) {
 		if(commands + 1 > end) {
 			WARN("command op is past end of command buffer\n");
@@ -384,8 +388,8 @@ void bind_fbo() {
 	uint8_t has_depth_attach = (fb_cfg & ENABLE_DEPTH_ATTACH_BIT) > 0;
 
 	if(n_color_attachs == 0 && !has_depth_attach) {
-		WARN("no configured color or depth attachments (you probably want to "
-			"set a render target)\n");
+		glDeleteFramebuffers(1, &gl_fbo);
+		gl_fbo = 0;
 		return;
 	}
 
@@ -394,10 +398,14 @@ void bind_fbo() {
 		object_t* tbo = ref_buffer_precise(tbo_addr, TYPE_TBO, LENGTH_IN_BUFFER);
 		if(!tbo) {
 			WARN("failed to get tbo %llx for color attachment %d\n", tbo_addr, i);
+			glDeleteFramebuffers(1, &gl_fbo);
+			gl_fbo = 0;
 			return;
 		}
 		if(!IS_COLOR_FORMAT(tbo->header.tex_format)) {
 			WARN("tbo %llx for color attachment is not of color format\n", tbo->addr);
+			glDeleteFramebuffers(1, &gl_fbo);
+			gl_fbo = 0;
 			return;
 		}
 		gl_bind_attachment(GL_COLOR_ATTACHMENT0 + i, tbo);
@@ -408,10 +416,14 @@ void bind_fbo() {
 		object_t* tbo = ref_buffer_precise(tbo_addr, TYPE_TBO, LENGTH_IN_BUFFER);
 		if(!tbo) {
 			WARN("failed to get tbo %llx for depth attachment\n", tbo_addr);
+			glDeleteFramebuffers(1, &gl_fbo);
+			gl_fbo = 0;
 			return;
 		}
 		if(IS_COLOR_FORMAT(tbo->header.tex_format)) {
 			WARN("tbo %llx for depth attachment is not of depth format\n", tbo->addr);
+			glDeleteFramebuffers(1, &gl_fbo);
+			gl_fbo = 0;
 			return;
 		}
 
@@ -424,6 +436,8 @@ void bind_fbo() {
 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	if(status != GL_FRAMEBUFFER_COMPLETE) {
 		WARN("framebuffer was incomplete\n");
+		glDeleteFramebuffers(1, &gl_fbo);
+		gl_fbo = 0;
 		return;
 	}
 
@@ -439,11 +453,15 @@ void bind_fbo() {
 
 	if(!w || !h) {
 		WARN("viewport dimension was 0, not setting viewport\n");
+		glDeleteFramebuffers(1, &gl_fbo);
+		gl_fbo = 0;
 		return;
 	}
 
 	if(x + w > fbo_dims[0] || y + h > fbo_dims[1]) {
 		WARN("viewport range exceeds attachment(s), not setting viewport\n");
+		glDeleteFramebuffers(1, &gl_fbo);
+		gl_fbo = 0;
 		return;
 	}
 
