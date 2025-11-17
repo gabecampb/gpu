@@ -5,9 +5,10 @@ uint32_t fbo_dims[2];
 uint32_t fbo_n_color_attachs;
 uint8_t cmd_regs[NUM_BYTES_CMD_REGS];
 
-void bind_fbo();
+void set_raster_states();
 void bind_vao(object_t* vbo);
 void gl_set_draw_buffers(uint8_t bmp);
+void bind_fbo();
 
 uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 	// before any command that might access descriptors, need to run
@@ -48,6 +49,11 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			if(check_overlap(x1, x2, y1, y2))
 				load_uregs();
 
+			y1 = RASTER_CFG_REG, y2 = RASTER_CFG_REG + 16 +
+				(MAX_COLOR_ATTACH_COUNT * 8) - 1;
+			if(check_overlap(x1, x2, y1, y2))
+				set_raster_states();
+
 			return 14;
 		} case CMD_SET_REG_64: {
 			if(cmd + 18 > end) {
@@ -81,6 +87,11 @@ uint32_t exec_cmd(uint16_t op, uint8_t* cmd, uint8_t* end) {
 			y1 = UNIFORM_0_REG, y2 = UNIFORM_0_REG + 127;
 			if(check_overlap(x1, x2, y1, y2))
 				load_uregs();
+
+			y1 = RASTER_CFG_REG, y2 = RASTER_CFG_REG + 16 +
+				(MAX_COLOR_ATTACH_COUNT * 8) - 1;
+			if(check_overlap(x1, x2, y1, y2))
+				set_raster_states();
 
 			return 18;
 		} case CMD_DRAW: {
@@ -157,6 +168,95 @@ void command_decoder(uint8_t* commands, uint64_t len) {
 		}
 		commands += read_amt;
 	}
+}
+
+void gl_set_stencil_cfg(GLenum face, uint64_t cfg) {
+	uint8_t func_idx = cfg & 0x7;
+	uint8_t func_ref = (cfg >> 3) & 0xFF;
+	uint8_t func_mask = (cfg >> 11) & 0xFF;
+
+	GLenum func[] = { GL_ALWAYS, GL_NEVER, GL_LESS, GL_LEQUAL, GL_GREATER,
+		GL_GEQUAL, GL_EQUAL, GL_NOTEQUAL };
+	glStencilFuncSeparate(face, func[func_idx], func_ref, func_mask);
+
+	uint8_t write_mask = (cfg >> 19) & 0xFF;
+	glStencilMaskSeparate(face, write_mask);
+
+	GLenum op[] = { GL_KEEP, GL_ZERO, GL_REPLACE, GL_INCR, GL_INCR_WRAP,
+		GL_DECR, GL_DECR_WRAP, GL_INVERT };
+	uint8_t spdp = (cfg >> 27) & 0x7;
+	uint8_t spdf = (cfg >> 30) & 0x7;
+	uint8_t sf = (cfg >> 33) & 0x7;
+	glStencilOpSeparate(face, op[sf], op[spdf], op[spdp]);
+}
+
+void check_blend_param_range(uint8_t* op, uint32_t maximum) {
+	if(*op > maximum) {
+		WARN("blending parameter %llu was invalid, defaulting to 0\n", *op);
+		*op = 0;
+	}
+}
+
+void gl_set_blend_cfg(uint32_t idx, uint64_t cfg) {
+	uint8_t a_dfac		= cfg & 0xF;
+	uint8_t a_sfac		= (cfg >> 4) & 0xF;
+	uint8_t a_op		= (cfg >> 8) & 0x7;
+	uint8_t rgb_dfac	= (cfg >> 11) & 0xF;
+	uint8_t rgb_sfac	= (cfg >> 15) & 0xF;
+	uint8_t rgb_op		= (cfg >> 18) & 0x7;
+
+	GLenum fac[] = { GL_ONE, GL_ZERO, GL_SRC_COLOR, GL_DST_COLOR, GL_SRC_ALPHA,
+		GL_DST_ALPHA, GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_DST_COLOR,
+		GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA };
+
+	check_blend_param_range(&a_dfac, 9);
+	check_blend_param_range(&a_sfac, 9);
+	check_blend_param_range(&rgb_dfac, 9);
+	check_blend_param_range(&rgb_sfac, 9);
+
+	glBlendFuncSeparatei(idx, fac[rgb_sfac], fac[rgb_dfac], fac[a_sfac], fac[a_dfac]);
+
+	GLenum op[] = { GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT,
+		GL_MIN, GL_MAX };
+
+	check_blend_param_range(&a_op, 4);
+	check_blend_param_range(&rgb_op, 4);
+
+	glBlendEquationSeparatei(idx, op[rgb_op], op[a_op]);
+}
+
+void set_raster_states() {
+	uint64_t cfg  = *(uint64_t*)(cmd_regs + RASTER_CFG_REG);
+	uint64_t cfg2 = *(uint64_t*)(cmd_regs + RASTER_CFG_REG + 8);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_STENCIL_TEST);
+	glEnable(GL_BLEND);
+
+	glEnable(GL_CULL_FACE);
+	switch(cfg & 0x3) {
+		case 0: glDisable(GL_CULL_FACE);		break;
+		case 1: glCullFace(GL_BACK);			break;
+		case 2: glCullFace(GL_FRONT);			break;
+		case 3: glCullFace(GL_FRONT_AND_BACK);	break;
+	}
+	((cfg >> 2) & 0x1) ? glFrontFace(GL_CW) : glFrontFace(GL_CCW);
+
+	uint8_t depth_func = (cfg >> 3) & 0x7;
+	uint8_t write_depth = (cfg >> 6) & 0x1;
+
+	glDepthMask(write_depth ? GL_TRUE : GL_FALSE);
+
+	GLenum func[] = { GL_ALWAYS, GL_NEVER, GL_LESS, GL_LEQUAL, GL_GREATER,
+		GL_GEQUAL, GL_EQUAL, GL_NOTEQUAL };
+	glDepthFunc(func[depth_func]);
+
+	gl_set_stencil_cfg(GL_BACK, cfg >> 9);
+	gl_set_stencil_cfg(GL_FRONT, (cfg2 << 19) | (cfg >> 45));
+
+	uint32_t* blend_cfg = (uint32_t*)(cmd_regs + BLEND_0_CFG_REG);
+	for(uint32_t i = 0; i < MAX_COLOR_ATTACH_COUNT; i++)
+		gl_set_blend_cfg(i, blend_cfg[i]);
 }
 
 void set_va(uint32_t index, uint32_t va_cfg) {

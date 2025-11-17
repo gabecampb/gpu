@@ -27,6 +27,8 @@
 #define DTBL_0_ADDR_REG		0xBC		/* MAX_DTABLE_COUNT */
 #define KERNEL_ADDR_REG		0xCC
 #define UNIFORM_0_REG		0xD4		/* 128 bytes */
+#define RASTER_CFG_REG		0x154		/* 16 bytes */
+#define BLEND_0_CFG_REG		0x164		/* MAX_COLOR_ATTACH_COUNT */
 
 #define ENABLE_DEPTH_ATTACH_BIT	(1 << 31)
 #define ENABLE_VA_BIT		(1 << 31)
