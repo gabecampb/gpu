@@ -7,6 +7,7 @@ pthread_mutex_t atomic_rw_mx = PTHREAD_MUTEX_INITIALIZER;
 
 void gpu_flip(uint64_t a, uint8_t v)	{ page_flip(a, v); }
 void gpu_batch()						{ issue_batch(); }
+void fence_irq()						{};
 void page_flip_irq()					{};
 void dma_read_complete_irq()			{};
 void dma_write_complete_irq()			{};

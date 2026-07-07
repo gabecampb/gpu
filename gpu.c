@@ -22,7 +22,8 @@ void dispatch_cmd_buffer(uint64_t addr) {
 	free(cmds);
 }
 
-void process_batch(uint64_t ring_addr, uint64_t read_ptr, uint64_t read_len) {
+void process_batch(uint64_t ring_addr, uint64_t read_ptr, uint64_t read_len,
+	uint64_t fence_cfg, uint64_t fence_value, uint64_t fence_addr) {
 	if(read_len == 0) {
 		WARN("read length for batch is 0, skipping\n");
 		return;
@@ -51,14 +52,35 @@ void process_batch(uint64_t ring_addr, uint64_t read_ptr, uint64_t read_len) {
 
 	free(batch);
 
-	glFinish();
+	glFlush();
+	if(fence_cfg & ENABLE_FENCE_BIT) {
+		if(fence_addr + 8 - 1 >= RAM_CAPACITY) {
+			WARN("fence address %llx out of bounds, skip fence\n", fence_addr);
+			return;
+		}
+		if(fence_addr % 8) {
+			WARN("fence address %llx misaligned, skip fence\n", fence_addr);
+			return;
+		}
+
+		glFinish();
+
+		uint32_t* fence = &get_ram()[fence_addr];
+		atomic_set_u64(fence, fence_value);
+
+		if(fence_cfg & ENABLE_FENCE_IRQ_BIT)
+			fence_irq();
+	}
 }
 
 void issue_batch() {
-	uint32_t* ctrl 		= (uint32_t*)&get_ram()[GPU_CTRL_REG];
-	uint64_t* ring_addr	= (uint64_t*)&get_ram()[QUEUE_ADDR_REG];
-	uint64_t* read_ptr	= (uint64_t*)&get_ram()[QUEUE_READ_PTR_REG];
-	uint64_t* read_len	= (uint64_t*)&get_ram()[QUEUE_READ_LEN_REG];
+	uint32_t* ctrl 			= (uint32_t*)&get_ram()[GPU_CTRL_REG];
+	uint64_t* ring_addr		= (uint64_t*)&get_ram()[QUEUE_ADDR_REG];
+	uint64_t* read_ptr		= (uint64_t*)&get_ram()[QUEUE_READ_PTR_REG];
+	uint64_t* read_len		= (uint64_t*)&get_ram()[QUEUE_READ_LEN_REG];
+	uint32_t* fence_cfg		= (uint32_t*)&get_ram()[FENCE_CFG_REG];
+	uint64_t* fence_value	= (uint64_t*)&get_ram()[FENCE_VALUE_REG];
+	uint64_t* fence_addr	= (uint64_t*)&get_ram()[FENCE_ADDR_REG];
 
 	if(!(*ctrl & DOORBELL_BIT))
 		return;
@@ -75,7 +97,7 @@ void issue_batch() {
 		return;
 	}
 
-	process_batch(*ring_addr, old_read_ptr, *read_len);
+	process_batch(*ring_addr, old_read_ptr, *read_len, *fence_cfg, *fence_value, *fence_addr);
 }
 
 void gpu_registers_update(void* cpu, uint64_t start, uint64_t length) {

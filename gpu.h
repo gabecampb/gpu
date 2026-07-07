@@ -7,6 +7,7 @@ void gpu_registers_update(void*, uint64_t, uint64_t);
 void issue_batch();
 
 // defined externally
+void fence_irq();
 void page_flip_irq();
 void dma_read_complete_irq();
 void dma_write_complete_irq();
@@ -46,6 +47,9 @@ void gpu_batch();
 #define WRITE_DST_ADDR_REG		0x26058
 #define WRITE_SRC_ADDR_REG		0x26060
 #define WRITE_LEN_REG			0x26068
+#define FENCE_CFG_REG			0x26070
+#define FENCE_VALUE_REG			0x26074
+#define FENCE_ADDR_REG			0x2607C
 
 // GPU control register flags
 #define DOORBELL_BIT (1 << 31)
@@ -57,5 +61,9 @@ void gpu_batch();
 // copy control register flags
 #define REQUEST_READ_BIT (1 << 31)
 #define REQUEST_WRITE_BIT (1 << 31)
+
+// fence config register flags
+#define ENABLE_FENCE_BIT (1 << 31)
+#define ENABLE_FENCE_IRQ_BIT (1 << 30)
 
 #endif
